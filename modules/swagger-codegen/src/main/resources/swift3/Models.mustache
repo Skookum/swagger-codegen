@@ -69,14 +69,13 @@ class Decoders {
 
     static func decode<T>(clazz: T.Type, source: AnyObject) -> T {
         initialize()
-        if T.self is Int32.Type && source is NSNumber {
-            return source.int32Value as! T;
-        }
-        if T.self is Int64.Type && source is NSNumber {
-            return source.int64Value as! T;
-        }
-        if T.self is UUID.Type && source is String {
-            return UUID(uuidString: source as! String) as! T
+        if let number = source as? NSNumber {
+            if T.self is Int32.Type {
+                return number.int32Value as! T;
+            }
+            if T.self is Int64.Type {
+                return number.int64Value as! T;
+            }
         }
         if source is T {
             return source as! T
