@@ -196,18 +196,20 @@ open class AlamofireRequestBuilder<T>: RequestBuilder<T> {
                     completion(Response(response: response.response!, body: (() as! T)), nil)
                     return
                 }
-                if let json: Any = response.result.value {
-                    let body = Decoders.decode(clazz: T.self, source: json as AnyObject)
-                    completion(Response(response: response.response!, body: body), nil)
+                do {
+                    if let json: Any = response.result.value {
+                        let body = try Decoders.decode(clazz: T.self, source: json as AnyObject)
+                        completion(Response(response: response.response!, body: body), nil)
+                        return
+                    } else if "" is T {
+                        // swagger-parser currently doesn't support void, which will be fixed in future swagger-parser release
+                        // https://github.com/swagger-api/swagger-parser/pull/34
+                        completion(Response(response: response.response!, body: ("" as! T)), nil)
                     return
-                } else if "" is T {
-                    // swagger-parser currently doesn't support void, which will be fixed in future swagger-parser release
-                    // https://github.com/swagger-api/swagger-parser/pull/34
-                    completion(Response(response: response.response!, body: ("" as! T)), nil)
-                    return
+                    }
+                } catch {
+                    completion(nil, ErrorResponse.Error(500, nil, NSError(domain: "localhost", code: 500, userInfo: ["reason": "unknown"])))
                 }
-
-                completion(nil, ErrorResponse.Error(500, nil, NSError(domain: "localhost", code: 500, userInfo: ["reason": "unreacheable code"])))
             }
         }
     }
