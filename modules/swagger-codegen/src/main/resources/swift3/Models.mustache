@@ -170,14 +170,14 @@ class Decoders {
         } {{#models}}{{#model}}
 
         // Decoder for [{{{classname}}}]
-        Decoders.addDecoder(clazz: [{{{classname}}}].self) { (source: AnyObject) -> [{{{classname}}}] in
-            return Decoders.decode(clazz: [{{{classname}}}].self, source: source)
+        Decoders.addDecoder(clazz: [{{{classname}}}].self) { (source: AnyObject) throws -> [{{{classname}}}] in
+            return try Decoders.decode(clazz: [{{{classname}}}].self, source: source)
         }
         // Decoder for {{{classname}}}
-        Decoders.addDecoder(clazz: {{{classname}}}.self) { (source: AnyObject) -> {{{classname}}} in
+        Decoders.addDecoder(clazz: {{{classname}}}.self) { (source: AnyObject) throws -> {{{classname}}} in
 {{#isArrayModel}}
             let sourceArray = source as! [AnyObject]
-            return sourceArray.map({ Decoders.decode(clazz: {{{arrayModelType}}}.self, source: $0) })
+            return try sourceArray.map({ Decoders.decode(clazz: {{{arrayModelType}}}.self, source: $0) })
 {{/isArrayModel}}
 {{^isArrayModel}}
 {{#isEnum}}
@@ -200,18 +200,18 @@ class Decoders {
             {{#discriminator}}
             // Check discriminator to support inheritance
             if let discriminator = sourceDictionary["{{discriminator}}"] as? String, discriminator != "{{classname}}"{
-                return Decoders.decode(clazz: {{classname}}.self, discriminator: discriminator, source: source)
+                return try Decoders.decode(clazz: {{classname}}.self, discriminator: discriminator, source: source)
             }
             {{/discriminator}}
 
             {{#unwrapRequired}}
-            let instance = {{classname}}({{#requiredVars}}{{^-first}}, {{/-first}}{{#isEnum}}{{name}}: {{classname}}.{{datatypeWithEnum}}(rawValue: (sourceDictionary["{{baseName}}"] as! {{datatype}}))! {{/isEnum}}{{^isEnum}}{{name}}: Decoders.decode(clazz: {{{baseType}}}.self, source: sourceDictionary["{{baseName}}"]! as AnyObject){{/isEnum}}{{/requiredVars}})
+            let instance = try {{classname}}({{#requiredVars}}{{^-first}}, {{/-first}}{{#isEnum}}{{name}}: {{classname}}.{{datatypeWithEnum}}(rawValue: (sourceDictionary["{{baseName}}"] as! {{datatype}}))! {{/isEnum}}{{^isEnum}}{{name}}: Decoders.decode(clazz: {{{baseType}}}.self, source: sourceDictionary["{{baseName}}"]! as AnyObject){{/isEnum}}{{/requiredVars}})
             {{#optionalVars}}{{#isEnum}}
             if let {{name}} = sourceDictionary["{{baseName}}"] as? {{datatype}} { {{^isContainer}}
                 instance.{{name}} = {{classname}}.{{datatypeWithEnum}}(rawValue: ({{name}})){{/isContainer}}{{#isListContainer}}
                 instance.{{name}}  = {{name}}.map ({ {{classname}}.{{enumName}}(rawValue: $0)! }){{/isListContainer}}
             }{{/isEnum}}{{^isEnum}}
-            instance.{{name}} = Decoders.decodeOptional(clazz: {{{baseType}}}.self, source: sourceDictionary["{{baseName}}"] as AnyObject?){{/isEnum}}
+            instance.{{name}} = try Decoders.decodeOptional(clazz: {{{baseType}}}.self, source: sourceDictionary["{{baseName}}"] as AnyObject?){{/isEnum}}
             {{/optionalVars}}
             {{/unwrapRequired}}
             {{^unwrapRequired}}
@@ -220,7 +220,7 @@ class Decoders {
                 instance.{{name}} = {{classname}}.{{datatypeWithEnum}}(rawValue: ({{name}})){{/isContainer}}{{#isListContainer}}
                 instance.{{name}}  = {{name}}.map ({ {{classname}}.{{enumName}}(rawValue: $0)! }){{/isListContainer}}{{#isMapContainer}}//TODO: handle enum map scenario{{/isMapContainer}}
             }{{/isEnum}}
-            {{^isEnum}}instance.{{name}} = Decoders.decodeOptional(clazz: {{{baseType}}}.self, source: sourceDictionary["{{baseName}}"] as AnyObject?){{/isEnum}}{{/allVars}}
+            {{^isEnum}}instance.{{name}} = try Decoders.decodeOptional(clazz: {{{baseType}}}.self, source: sourceDictionary["{{baseName}}"] as AnyObject?){{/isEnum}}{{/allVars}}
             {{/unwrapRequired}}
             return instance
 {{/allVars.isEmpty}}
