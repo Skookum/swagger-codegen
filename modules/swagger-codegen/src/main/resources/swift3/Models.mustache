@@ -38,12 +38,12 @@ open class Response<T> {
 private var once = Int()
 class Decoders {
     static fileprivate var decoders = Dictionary<String, ((AnyObject) throws -> Any)>()
-    
+
     static func addDecoder<T>(clazz: T.Type, decoder: @escaping ((AnyObject) throws -> T)) {
         let key = "\(T.self)"
         decoders[key] = { try decoder($0) as AnyObject }
     }
-    
+
     static func decode<T>(clazz: T.Type, discriminator: String, source: AnyObject) throws -> T {
         let key = discriminator;
         if let decoder = decoders[key] {
@@ -52,14 +52,14 @@ class Decoders {
             throw ModelErrors.parsingError
         }
     }
-    
+
     static func decode<T>(clazz: [T].Type, source: AnyObject) throws -> [T] {
         let array = source as! [AnyObject]
         return try array.map {
             try Decoders.decode(clazz: T.self, source: $0)
         }
     }
-    
+
     static func decode<T, Key: Hashable>(clazz: [Key:T].Type, source: AnyObject) throws -> [Key:T] {
         let sourceDictionary = source as! [Key: AnyObject]
         var dictionary = [Key:T]()
@@ -68,7 +68,7 @@ class Decoders {
         }
         return dictionary
     }
-    
+
     static func decode<T>(clazz: T.Type, source: AnyObject) throws -> T {
         initialize()
         if let number = source as? NSNumber {
@@ -85,7 +85,7 @@ class Decoders {
         if T.self is Data.Type && source is String {
             return Data(base64Encoded: source as! String) as! T
         }
-        
+
         let key = "\(T.self)"
         if let decoder = decoders[key] {
             return try decoder(source) as! T
@@ -93,32 +93,51 @@ class Decoders {
             throw ModelErrors.parsingError
         }
     }
-    
+
     static func decodeOptional<T>(clazz: T.Type, source: AnyObject?) throws -> T? {
         if source is NSNull {
             return nil
         }
-        return try source.map { (source: AnyObject) -> T in
-            try Decoders.decode(clazz: clazz, source: source)
+        var value: T? = nil
+        do {
+            value = try source.map { (source: AnyObject) -> T in
+                try Decoders.decode(clazz: clazz, source: source)
+            }
+        } catch {
+            // Do nothing
         }
+        return value
     }
-    
+
     static func decodeOptional<T>(clazz: [T].Type, source: AnyObject?) throws -> [T]? {
         if source is NSNull {
             return nil
         }
-        return try source.map { (someSource: AnyObject) -> [T] in
-            try Decoders.decode(clazz: clazz, source: someSource)
+        var value: [T]? = nil
+        do {
+            value = try source.map { (someSource: AnyObject) -> [T] in
+                try Decoders.decode(clazz: clazz, source: someSource)
+            }
+        } catch {
+            // Do nothing
         }
+        return value
     }
-    
+
     static func decodeOptional<T, Key: Hashable>(clazz: [Key:T].Type, source: AnyObject?) throws -> [Key:T]? {
         if source is NSNull {
             return nil
         }
-        return try source.map { (someSource: AnyObject) -> [Key:T] in
-            try Decoders.decode(clazz: clazz, source: someSource)
+
+        var value: [Key:T]? = nil
+        do {
+            value = try source.map { (someSource: AnyObject) -> [Key:T] in
+                try Decoders.decode(clazz: clazz, source: someSource)
+            }
+        } catch {
+            // Do nothing
         }
+        return value
     }
 
     private static var __once: () = {
@@ -135,7 +154,7 @@ class Decoders {
             return formatter
         }
         // Decoder for Date
-        Decoders.addDecoder(clazz: Date.self) { (source: AnyObject) throws -> Date in
+        Decoders.addDecoder(clazz: Date.self) { (source: AnyObject) -> Date in
            if let sourceString = source as? String {
                 for formatter in formatters {
                     if let date = formatter.date(from: sourceString) {
@@ -147,18 +166,18 @@ class Decoders {
                 // treat as a java date
                 return Date(timeIntervalSince1970: Double(sourceInt / 1000) )
             }
-            throw ModelErrors.dateParsingError
+            fatalError("formatter failed to parse \(source)")
         } {{#models}}{{#model}}
 
         // Decoder for [{{{classname}}}]
         Decoders.addDecoder(clazz: [{{{classname}}}].self) { (source: AnyObject) -> [{{{classname}}}] in
-            return try Decoders.decode(clazz: [{{{classname}}}].self, source: source)
+            return Decoders.decode(clazz: [{{{classname}}}].self, source: source)
         }
         // Decoder for {{{classname}}}
         Decoders.addDecoder(clazz: {{{classname}}}.self) { (source: AnyObject) -> {{{classname}}} in
 {{#isArrayModel}}
             let sourceArray = source as! [AnyObject]
-            return sourceArray.map({ try Decoders.decode(clazz: {{{arrayModelType}}}.self, source: $0) })
+            return sourceArray.map({ Decoders.decode(clazz: {{{arrayModelType}}}.self, source: $0) })
 {{/isArrayModel}}
 {{^isArrayModel}}
 {{#isEnum}}
@@ -181,7 +200,7 @@ class Decoders {
             {{#discriminator}}
             // Check discriminator to support inheritance
             if let discriminator = sourceDictionary["{{discriminator}}"] as? String, discriminator != "{{classname}}"{
-                return try Decoders.decode(clazz: {{classname}}.self, discriminator: discriminator, source: source)
+                return Decoders.decode(clazz: {{classname}}.self, discriminator: discriminator, source: source)
             }
             {{/discriminator}}
 
@@ -192,7 +211,7 @@ class Decoders {
                 instance.{{name}} = {{classname}}.{{datatypeWithEnum}}(rawValue: ({{name}})){{/isContainer}}{{#isListContainer}}
                 instance.{{name}}  = {{name}}.map ({ {{classname}}.{{enumName}}(rawValue: $0)! }){{/isListContainer}}
             }{{/isEnum}}{{^isEnum}}
-            try instance.{{name}} = Decoders.decodeOptional(clazz: {{{baseType}}}.self, source: sourceDictionary["{{baseName}}"] as AnyObject?){{/isEnum}}
+            instance.{{name}} = Decoders.decodeOptional(clazz: {{{baseType}}}.self, source: sourceDictionary["{{baseName}}"] as AnyObject?){{/isEnum}}
             {{/optionalVars}}
             {{/unwrapRequired}}
             {{^unwrapRequired}}
@@ -201,7 +220,7 @@ class Decoders {
                 instance.{{name}} = {{classname}}.{{datatypeWithEnum}}(rawValue: ({{name}})){{/isContainer}}{{#isListContainer}}
                 instance.{{name}}  = {{name}}.map ({ {{classname}}.{{enumName}}(rawValue: $0)! }){{/isListContainer}}{{#isMapContainer}}//TODO: handle enum map scenario{{/isMapContainer}}
             }{{/isEnum}}
-            {{^isEnum}}instance.{{name}} = try Decoders.decodeOptional(clazz: {{{baseType}}}.self, source: sourceDictionary["{{baseName}}"] as AnyObject?){{/isEnum}}{{/allVars}}
+            {{^isEnum}}instance.{{name}} = Decoders.decodeOptional(clazz: {{{baseType}}}.self, source: sourceDictionary["{{baseName}}"] as AnyObject?){{/isEnum}}{{/allVars}}
             {{/unwrapRequired}}
             return instance
 {{/allVars.isEmpty}}
@@ -214,10 +233,4 @@ class Decoders {
     static fileprivate func initialize() {
         _ = Decoders.__once
     }
-}
-
-
-enum ModelErrors: Error {
-    case parsingError
-    case dateParsingError
 }
