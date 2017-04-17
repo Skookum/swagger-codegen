@@ -89,10 +89,10 @@ public class Swift3ModelTest {
 
         final CodegenProperty property6 = cm.vars.get(5);
         Assert.assertEquals(property6.baseName, "uuid");
-        Assert.assertEquals(property6.datatype, "UUID");
+        Assert.assertEquals(property6.datatype, "String");
         Assert.assertEquals(property6.name, "uuid");
         Assert.assertNull(property6.defaultValue);
-        Assert.assertEquals(property6.baseType, "UUID");
+        Assert.assertEquals(property6.baseType, "String");
         Assert.assertFalse(property6.hasMore);
         Assert.assertFalse(property6.required);
         Assert.assertTrue(property6.isNotContainer);
